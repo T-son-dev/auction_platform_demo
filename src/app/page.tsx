@@ -55,6 +55,18 @@ import {
 type TabType = "dashboard" | "auctions" | "users" | "transactions" | "settings";
 type ViewType = "list" | "detail";
 
+interface NewAuctionForm {
+  title: string;
+  description: string;
+  category: string;
+  startingPrice: string;
+  minIncrement: string;
+  duration: string;
+  condition: string;
+  location: string;
+  shipping: boolean;
+}
+
 export default function AuctionPlatform() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
@@ -63,6 +75,8 @@ export default function AuctionPlatform() {
   const [showBidSuccess, setShowBidSuccess] = useState(false);
   const [currentBids, setCurrentBids] = useState<Bid[]>(bids);
   const [auctionData, setAuctionData] = useState(auctions);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateSuccess, setShowCreateSuccess] = useState(false);
 
   const handleViewAuction = (auction: Auction) => {
     setSelectedAuction(auction);
@@ -111,6 +125,38 @@ export default function AuctionPlatform() {
     setShowBidSuccess(true);
     setTimeout(() => setShowBidSuccess(false), 3000);
     setBidAmount(String(amount + selectedAuction.minIncrement));
+  };
+
+  const handleCreateAuction = (formData: NewAuctionForm) => {
+    const newAuction: Auction = {
+      id: `a${Date.now()}`,
+      title: formData.title,
+      description: formData.description,
+      category: formData.category,
+      images: [
+        "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&h=600&fit=crop",
+      ],
+      sellerId: "u1",
+      sellerName: "Admin",
+      startingPrice: parseFloat(formData.startingPrice),
+      currentBid: parseFloat(formData.startingPrice),
+      minIncrement: parseFloat(formData.minIncrement),
+      totalBids: 0,
+      watchers: 0,
+      status: "active",
+      startTime: new Date().toISOString(),
+      endTime: new Date(Date.now() + parseInt(formData.duration) * 24 * 60 * 60 * 1000).toISOString(),
+      timeLeft: `${formData.duration}d 0h 0m`,
+      condition: formData.condition as "new" | "like_new" | "good" | "fair",
+      location: formData.location,
+      shipping: formData.shipping,
+      featured: false,
+    };
+
+    setAuctionData([newAuction, ...auctionData]);
+    setShowCreateModal(false);
+    setShowCreateSuccess(true);
+    setTimeout(() => setShowCreateSuccess(false), 3000);
   };
 
   return (
@@ -199,7 +245,7 @@ export default function AuctionPlatform() {
                 />
                 <div>
                   <p className="font-medium text-gray-900 text-sm">Admin</p>
-                  <p className="text-xs text-gray-500">Gerente</p>
+                  <p className="text-xs text-gray-500">Jason Hiroshi</p>
                 </div>
               </div>
             </div>
@@ -214,6 +260,8 @@ export default function AuctionPlatform() {
             <AuctionsListView
               auctions={auctionData}
               onViewAuction={handleViewAuction}
+              onCreateNew={() => setShowCreateModal(true)}
+              showSuccess={showCreateSuccess}
             />
           )}
 
@@ -234,6 +282,14 @@ export default function AuctionPlatform() {
           {activeTab === "settings" && <SettingsView />}
         </div>
       </main>
+
+      {/* Create Auction Modal */}
+      {showCreateModal && (
+        <CreateAuctionModal
+          onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreateAuction}
+        />
+      )}
     </div>
   );
 }
@@ -385,9 +441,13 @@ function DashboardView({
 function AuctionsListView({
   auctions,
   onViewAuction,
+  onCreateNew,
+  showSuccess,
 }: {
   auctions: Auction[];
   onViewAuction: (auction: Auction) => void;
+  onCreateNew: () => void;
+  showSuccess: boolean;
 }) {
   const [filter, setFilter] = useState<"all" | "active" | "ending_soon" | "ended">("all");
 
@@ -398,12 +458,23 @@ function AuctionsListView({
 
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {showSuccess && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <p className="text-green-800 font-medium">Leilao criado com sucesso!</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gerenciamento de Leiloes</h1>
           <p className="text-gray-500">{auctions.length} leiloes cadastrados</p>
         </div>
-        <button className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2">
+        <button
+          onClick={onCreateNew}
+          className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"
+        >
           <Plus className="w-4 h-4" />
           Novo Leilao
         </button>
@@ -1211,5 +1282,214 @@ function StatusBadge({ status, className = "" }: { status: string; className?: s
     <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles]} ${className}`}>
       {labels[status as keyof typeof labels]}
     </span>
+  );
+}
+
+// Create Auction Modal
+function CreateAuctionModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (formData: NewAuctionForm) => void;
+}) {
+  const [formData, setFormData] = useState<NewAuctionForm>({
+    title: "",
+    description: "",
+    category: "Arte",
+    startingPrice: "",
+    minIncrement: "100",
+    duration: "7",
+    condition: "good",
+    location: "",
+    shipping: true,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title || !formData.description || !formData.startingPrice || !formData.location) {
+      return;
+    }
+    onCreate(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Criar Novo Leilao</h2>
+            <p className="text-sm text-gray-500">Preencha os dados do produto</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Titulo do Produto *
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="Ex: Relogio Rolex Submariner Vintage"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Descricao *
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Descreva o produto em detalhes..."
+              rows={4}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              required
+            />
+          </div>
+
+          {/* Category & Condition */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Categoria
+              </label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Condicao
+              </label>
+              <select
+                value={formData.condition}
+                onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="new">Novo</option>
+                <option value="like_new">Como Novo</option>
+                <option value="good">Bom</option>
+                <option value="fair">Regular</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Pricing */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Preco Inicial (R$) *
+              </label>
+              <input
+                type="number"
+                value={formData.startingPrice}
+                onChange={(e) => setFormData({ ...formData, startingPrice: e.target.value })}
+                placeholder="1000"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Incremento Minimo (R$)
+              </label>
+              <input
+                type="number"
+                value={formData.minIncrement}
+                onChange={(e) => setFormData({ ...formData, minIncrement: e.target.value })}
+                placeholder="100"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          {/* Duration & Location */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Duracao (dias)
+              </label>
+              <select
+                value={formData.duration}
+                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="3">3 dias</option>
+                <option value="5">5 dias</option>
+                <option value="7">7 dias</option>
+                <option value="10">10 dias</option>
+                <option value="14">14 dias</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Localizacao *
+              </label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="Sao Paulo, SP"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Shipping */}
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="shipping"
+              checked={formData.shipping}
+              onChange={(e) => setFormData({ ...formData, shipping: e.target.checked })}
+              className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label htmlFor="shipping" className="text-sm text-gray-700">
+              Disponivel para envio (frete por conta do comprador)
+            </label>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <Gavel className="w-4 h-4" />
+              Criar Leilao
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
